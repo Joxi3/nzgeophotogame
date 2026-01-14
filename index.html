@@ -332,7 +332,7 @@
 
       opacity: 0;
       pointer-events: none;
-      z-index: 5;
+      z-index: 999; /* CHANGED: make sure it sits above the image/skeleton */
     }
 
     .revealPop.on{
@@ -402,8 +402,10 @@
         <div class="imgwrap">
           <div class="skeleton" id="skeleton"></div>
           <img id="photo" alt="Random New Zealand photo" />
-          <div class="revealPop" id="revealPop"></div>
         </div>
+
+        <!-- CHANGED: pop-up is now a sibling of imgwrap (not inside it) -->
+        <div class="revealPop" id="revealPop"></div>
       </div>
 
       <div class="bottom">
@@ -717,7 +719,7 @@
     answerEl.classList.add("on");
     answerHintEl.textContent = "Location name pulled from the image's description or filename.";
 
-    // NEW: quick pop-up over the image
+    // quick pop-up over the image
     showRevealPop(current.placeName);
 
     answerCard.classList.remove("pop");

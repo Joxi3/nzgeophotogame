@@ -3,16 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <meta name="theme-color" content="#0b1020" />
-  <meta name="description" content="A New Zealand photo guessing game." />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="icon-192.png" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>New Zealand Locations and Landscape Guesser</title>
-
   <style>
     :root{
       --bg1:#0b1020;
@@ -147,8 +138,7 @@
 
     .stage{
       position: relative;
-      /* Default: size to the loaded image (no extra blank space) */
-      height: auto;
+      height: min(70vh, 640px);
       background:
         radial-gradient(900px 450px at 50% 5%, rgba(255,255,255,.10), transparent 60%),
         rgba(0,0,0,.18);
@@ -157,37 +147,23 @@
       justify-content:center;
     }
 
-    /* While loading we keep the old “big stage” so the skeleton has room */
-    .stage.loading{
-      height: min(70vh, 640px);
-    }
-
     .imgwrap{
       position: relative;
       width: 100%;
-      /* Let content (the image) define height once loaded */
-      height: auto;
-      padding: 14px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-
-    /* During loading, fill the fixed-height stage so the skeleton shows */
-    .stage.loading .imgwrap{
       height: 100%;
+      padding: 14px;
     }
 
     img#photo{
       width: 100%;
-      height: auto;
-      max-height: min(70vh, 640px);
+      height: 100%;
       object-fit: contain;
       border-radius: 16px;
       filter: drop-shadow(0 18px 40px rgba(0,0,0,.55));
       opacity: 0;
       transform: scale(.985);
       transition: opacity .35s ease, transform .35s ease;
+      background: rgba(255,255,255,.03);
     }
     img#photo.loaded{
       opacity: 1;
@@ -309,50 +285,8 @@
       .rightTop{ justify-content:flex-start; }
     }
 
-    /* === Reveal pop-up bubble (temporary) === */
-    .revealPop{
-      position: absolute;
-      left: 50%;
-      top: 22%;
-      transform: translate(-50%, -50%) scale(.96);
-      padding: 14px 18px;
-      border-radius: 16px;
-
-      background: rgba(10, 14, 24, .62);
-      border: 2px solid rgba(46, 204, 113, .75);
-      box-shadow: 0 18px 55px rgba(0,0,0,.55);
-      backdrop-filter: blur(10px);
-
-      color: var(--text);
-      font-weight: 800;
-      letter-spacing: .2px;
-      font-size: clamp(1.2rem, 2.2vw, 2.2rem);
-      text-align: center;
-      max-width: min(92%, 720px);
-
-      opacity: 0;
-      pointer-events: none;
-      z-index: 999; /* CHANGED: make sure it sits above the image/skeleton */
-    }
-
-    .revealPop.on{
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-      animation:
-        popIn .18s ease-out,
-        popOut .28s ease-in 1.55s forwards;
-    }
-
-    @keyframes popIn{
-      0%   { opacity: 0; transform: translate(-50%, -50%) scale(.96); }
-      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    }
-
-    @keyframes popOut{
-      to { opacity: 0; transform: translate(-50%, -50%) scale(.98); }
-    }
+    button svg { flex: 0 0 auto; }
   </style>
-
 </head>
 
 <body>
@@ -384,7 +318,6 @@
             </svg>
             Reveal
           </button>
-
         </div>
 
         <div class="right">
@@ -403,9 +336,6 @@
           <div class="skeleton" id="skeleton"></div>
           <img id="photo" alt="Random New Zealand photo" />
         </div>
-
-        <!-- CHANGED: pop-up is now a sibling of imgwrap (not inside it) -->
-        <div class="revealPop" id="revealPop"></div>
       </div>
 
       <div class="bottom">
@@ -431,33 +361,40 @@
   <div class="toast" id="toast"></div>
 
 <script>
-  // --- Filtering: skip wildlife ---
+  // ============================
+  // UNSPLASH ONLY (add your key)
+  // ============================
+  const UNSPLASH_ACCESS_KEY = "OsJIVxegKk4aFOOdQpCOd_NfKsaIm0AX6nZEddTn0Hc";
+  const UTM_SOURCE = "nz_location_guesser";
+  const UTM_MEDIUM = "referral";
+
+  // --- Filtering: skip wildlife (best-effort on text/tags) ---
   const WILDLIFE_BLOCKLIST = [
-    /birds?/i, /animals?/i, /wildlife/i, /fauna/i, /plant/i, /bird/i, /animal/i, /baby/i, /flower/i,
+    /birds?/i, /animals?/i, /wildlife/i, /fauna/i,
     /insects?/i, /fish/i, /mammals?/i, /reptiles?/i, /amphibians?/i
   ];
 
-  // --- Pools ---
-  const CATEGORIES_ART = [
-    "Category:Featured_pictures_of_New_Zealand",
-    "Category:Valued_images_of_New_Zealand",
-    "Category:Quality_images_of_New_Zealand"
+  // Keep your Mode UI exactly the same, but use it to pick search queries
+  const QUERIES_ART = [
+    "new zealand landscape",
+    "new zealand mountains landscape",
+    "new zealand lake landscape",
+    "new zealand fjord landscape",
+    "new zealand coastline landscape",
+    "new zealand national park landscape",
+    "new zealand sunrise landscape",
+    "new zealand sunset landscape"
   ];
 
-  const CATEGORIES_MIX = [
-    "Category:Featured_pictures_of_New_Zealand",
-    "Category:Valued_images_of_New_Zealand",
-    "Category:Quality_images_of_New_Zealand",
-    "Category:Landscapes_of_New_Zealand",
-    "Category:Mountains_of_New_Zealand",
-    "Category:Lakes_of_New_Zealand",
-    "Category:Beaches_of_New_Zealand",
-    "Category:Fiords_of_New_Zealand",
-    "Category:Coasts_of_New_Zealand",
-    "Category:Rivers_of_New_Zealand",
-    "Category:Waterfalls_of_New_Zealand",
-    "Category:National_parks_of_New_Zealand",
-    "Category:Scenic_reserves_of_New_Zealand"
+  const QUERIES_MIX = [
+    "new zealand scenic",
+    "new zealand beach landscape",
+    "new zealand road landscape",
+    "new zealand forest landscape",
+    "new zealand waterfall landscape",
+    "new zealand river landscape",
+    "new zealand glacier landscape",
+    "new zealand rugged coast landscape"
   ];
 
   // --- Prevent repeats (persisted) ---
@@ -479,24 +416,21 @@
   const statusChip = document.getElementById("statusChip");
   const skeleton = document.getElementById("skeleton");
   const imgEl = document.getElementById("photo");
-  const stageEl = document.querySelector(".stage");
   const creditEl = document.getElementById("credit");
   const answerEl = document.getElementById("answer");
   const answerHintEl = document.getElementById("answerHint");
   const toastEl = document.getElementById("toast");
   const sourceChip = document.getElementById("sourceChip");
   const answerCard = document.getElementById("answerCard");
-  const revealPopEl = document.getElementById("revealPop");
 
   const btnNew = document.getElementById("btnNew");
   const btnReveal = document.getElementById("btnReveal");
   const btnCopy = document.getElementById("btnCopy");
   const modeEl = document.getElementById("mode");
 
-  let cachedFiles = new Map();
   let current = null;
 
-  function setStatus(text){ statusChip.innerHTML = `Status: ${text}`; }
+  function setStatus(text){ statusChip.textContent = `Status: ${text}`; }
   function toast(msg){
     toastEl.textContent = msg;
     toastEl.classList.add("on");
@@ -505,137 +439,16 @@
   }
   function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-  function stripHtml(s){
-    const div = document.createElement("div");
-    div.innerHTML = s;
-    return (div.textContent || div.innerText || "").trim();
-  }
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  function cleanupTitleToPlace(title){
-    let t = title.replace(/^File:/i, "");
-    t = t.replace(/\.[a-z0-9]{2,5}$/i, "");
-    t = t.replace(/\s*\(.*?\)\s*/g, " ");
-    t = t.replace(/[_]+/g, " ");
-    t = t.replace(/\b(IMG|DSC|PXL|DJI|NZ|New Zealand|Aotearoa)\b/gi, " ");
-    t = t.replace(/\b\d{4}\b/g, " ");
-    t = t.replace(/\s+/g, " ").trim();
-    return t || "Unknown location";
-  }
-  function looksLikeJunkName(s){
-    const t = (s||"").trim();
-    if (t.length < 4) return true;
-    if (/^(img|dsc|pxl|dji)[-_ ]?\d+/i.test(t)) return true;
-    if (/^\d{4,}$/i.test(t)) return true;
-    return false;
-  }
-
   function setLoading(on){
     skeleton.classList.toggle("on", on);
-    stageEl && stageEl.classList.toggle("loading", on);
     if (on){
       imgEl.classList.remove("loaded");
       imgEl.removeAttribute("src");
     }
-  }
-
-  function showRevealPop(text){
-    if (!revealPopEl) return;
-    revealPopEl.textContent = text;
-
-    revealPopEl.classList.remove("on");
-    void revealPopEl.offsetWidth; // restart animation
-    revealPopEl.classList.add("on");
-
-    clearTimeout(showRevealPop._t);
-    showRevealPop._t = setTimeout(() => {
-      revealPopEl.classList.remove("on");
-    }, 1900);
-  }
-
-  async function apiCategoryMembers(catTitle, type="file", limit=300){
-    const url =
-      "https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json" +
-      "&generator=categorymembers" +
-      "&gcmtitle=" + encodeURIComponent(catTitle) +
-      "&gcmtype=" + encodeURIComponent(type) +
-      "&gcmlimit=" + limit;
-
-    const r = await fetch(url);
-    const j = await r.json();
-    const pages = j?.query?.pages ? Object.values(j.query.pages) : [];
-    return pages.map(p => p.title).filter(Boolean);
-  }
-
-  async function getFilesSmart(rootCat){
-    let files = await apiCategoryMembers(rootCat, "file", 300);
-    if (files.length >= 20) return files;
-
-    const subs = await apiCategoryMembers(rootCat, "subcat", 300);
-    for (let i = 0; i < Math.min(10, subs.length); i++){
-      const sc = pick(subs);
-      const subFiles = await apiCategoryMembers(sc, "file", 300);
-      if (subFiles.length) return subFiles;
-    }
-    return files;
-  }
-
-  async function loadPoolForMode(){
-    const cats = (modeEl.value === "art") ? CATEGORIES_ART : CATEGORIES_MIX;
-
-    for (let tries = 0; tries < 6; tries++){
-      const cat = pick(cats);
-      if (cachedFiles.has(cat) && cachedFiles.get(cat).length > 10) return cat;
-
-      setStatus("Loading photo pool...");
-      const files = await getFilesSmart(cat);
-      cachedFiles.set(cat, files.filter(t => t.startsWith("File:")));
-      if (cachedFiles.get(cat).length > 10) return cat;
-    }
-    return pick(cats);
-  }
-
-  async function fetchFileDetails(fileTitle){
-    const url =
-      "https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json" +
-      "&titles=" + encodeURIComponent(fileTitle) +
-      "&prop=imageinfo|categories" +
-      "&cllimit=50&clshow=!hidden" +
-      "&iiprop=url|extmetadata";
-
-    const r = await fetch(url);
-    const j = await r.json();
-    const page = j?.query?.pages ? Object.values(j.query.pages)[0] : null;
-    const ii = page?.imageinfo?.[0];
-    if (!ii?.url) return null;
-
-    const cats = (page?.categories || []).map(c => c.title || "");
-    const isWildlife = cats.some(ct => WILDLIFE_BLOCKLIST.some(rx => rx.test(ct)));
-    if (isWildlife) return null;
-
-    const md = ii?.extmetadata || {};
-    const artist = md?.Artist?.value ? stripHtml(md.Artist.value) : "Unknown";
-    const license = md?.LicenseShortName?.value ? stripHtml(md.LicenseShortName.value) : "Unknown license";
-    const desc = md?.ImageDescription?.value ? stripHtml(md.ImageDescription.value) : "";
-
-    const filePageUrl = "https://commons.wikimedia.org/wiki/" + encodeURIComponent(fileTitle);
-
-    let placeName = "";
-    if (desc && desc.length <= 90 && !looksLikeJunkName(desc)) placeName = desc;
-    if (!placeName){
-      const cleaned = cleanupTitleToPlace(fileTitle);
-      placeName = looksLikeJunkName(cleaned) ? "Unknown location" : cleaned;
-    }
-
-    return { fileTitle, imageUrl: ii.url, filePageUrl, artist, license, placeName };
-  }
-
-  function updateCredits(d){
-    creditEl.innerHTML =
-      `Source: <a href="${d.filePageUrl}" target="_blank" rel="noreferrer">Wikimedia Commons</a><br/>` +
-      `Artist: ${escapeHtml(d.artist)} · License: ${escapeHtml(d.license)}`;
   }
 
   function resetAnswerUI(){
@@ -656,7 +469,89 @@
     });
   }
 
+  function isWildlifeText(s){
+    const t = (s || "").toString();
+    return WILDLIFE_BLOCKLIST.some(rx => rx.test(t));
+  }
+
+  function photoLooksWildlife(photo){
+    const tagTitles = (photo?.tags || []).map(t => t?.title || "").join(" ");
+    const blob = [
+      photo?.alt_description || "",
+      photo?.description || "",
+      tagTitles
+    ].join(" ");
+    return isWildlifeText(blob);
+  }
+
+  function withUtm(url){
+    try{
+      const u = new URL(url);
+      u.searchParams.set("utm_source", UTM_SOURCE);
+      u.searchParams.set("utm_medium", UTM_MEDIUM);
+      return u.toString();
+    } catch {
+      return url;
+    }
+  }
+
+  async function fetchUnsplashRandom(query){
+    const url = new URL("https://api.unsplash.com/photos/random");
+    url.searchParams.set("client_id", UNSPLASH_ACCESS_KEY);
+    url.searchParams.set("query", query);
+    url.searchParams.set("orientation", "landscape");
+    url.searchParams.set("content_filter", "high");
+
+    const r = await fetch(url.toString());
+    if (!r.ok) return null;
+    return await r.json();
+  }
+
+  function buildCurrentFromUnsplash(photo){
+    const imageUrl = photo?.urls?.regular || photo?.urls?.full || photo?.urls?.raw;
+    const photoPageUrl = withUtm(photo?.links?.html || "https://unsplash.com");
+    const artistName = photo?.user?.name || "Unknown";
+    const artistUrl = withUtm(photo?.user?.links?.html || "https://unsplash.com");
+    const license = "Unsplash";
+
+    // Location is often missing on Unsplash; use best available fallback
+    let placeName = (photo?.location?.name || "").trim();
+    if (!placeName){
+      placeName = "New Zealand";
+    }
+
+    return {
+      id: photo?.id || imageUrl,
+      imageUrl,
+      filePageUrl: photoPageUrl,
+      artist: artistName,
+      artistUrl,
+      license,
+      placeName,
+      download_location: photo?.links?.download_location || ""
+    };
+  }
+
+  function updateCredits(d){
+    // Keep your Credits card, but point to Unsplash + photographer (with UTM)
+    creditEl.innerHTML =
+      `Source: <a href="${d.filePageUrl}" target="_blank" rel="noreferrer">Unsplash</a><br/>` +
+      `Artist: <a href="${d.artistUrl}" target="_blank" rel="noreferrer">${escapeHtml(d.artist)}</a> · License: ${escapeHtml(d.license)}`;
+  }
+
+  function triggerDownload(d){
+    // Unsplash guideline: hit download_location when a photo is used
+    if (!d?.download_location) return;
+    const url = `${d.download_location}?client_id=${encodeURIComponent(UNSPLASH_ACCESS_KEY)}`;
+    fetch(url).catch(()=>{});
+  }
+
   async function newPhoto(){
+    if (!UNSPLASH_ACCESS_KEY || UNSPLASH_ACCESS_KEY.includes("PASTE_YOUR")) {
+      setStatus("Add your Unsplash API key in the code");
+      return;
+    }
+
     btnNew.disabled = true;
     btnReveal.disabled = true;
     setLoading(true);
@@ -665,23 +560,30 @@
     setStatus("Finding next photo…");
 
     try{
-      const chosenCat = await loadPoolForMode();
-      const files = cachedFiles.get(chosenCat) || [];
+      const queries = (modeEl.value === "art") ? QUERIES_ART : QUERIES_MIX;
 
-      for (let attempt = 0; attempt < 80; attempt++){
-        if (!files.length) break;
+      for (let attempt = 0; attempt < 40; attempt++){
+        const q = pick(queries);
+        const photo = await fetchUnsplashRandom(q);
+        if (!photo) continue;
 
-        const fileTitle = pick(files);
-        if (hasSeen(fileTitle)) continue;
+        // best-effort wildlife filter
+        if (photoLooksWildlife(photo)) continue;
 
-        const d = await fetchFileDetails(fileTitle);
-        if (!d) continue;
+        const d = buildCurrentFromUnsplash(photo);
+        if (!d.imageUrl) continue;
 
+        if (hasSeen(d.id)) continue;
+
+        // test load before committing
         const ok = await loadImage(d.imageUrl);
         if (!ok) continue;
 
         current = d;
-        markSeen(fileTitle);
+        markSeen(d.id);
+
+        // Trigger download tracking (non-blocking)
+        triggerDownload(d);
 
         imgEl.onload = () => {
           imgEl.classList.add("loaded");
@@ -717,10 +619,7 @@
 
     answerEl.textContent = current.placeName;
     answerEl.classList.add("on");
-    answerHintEl.textContent = "Location name pulled from the image's description or filename.";
-
-    // quick pop-up over the image
-    showRevealPop(current.placeName);
+    answerHintEl.textContent = "Location name pulled from the photo metadata (when available).";
 
     answerCard.classList.remove("pop");
     void answerCard.offsetWidth;
@@ -728,7 +627,7 @@
 
     btnCopy.disabled = false;
     sourceChip.style.display = "inline-flex";
-    sourceChip.innerHTML = `<b>Open source:</b> Commons page`;
+    sourceChip.innerHTML = `<b>Open source:</b> Unsplash page`;
     sourceChip.onclick = () => window.open(current.filePageUrl, "_blank");
 
     toast("Revealed");
@@ -758,15 +657,9 @@
     if (e.key.toLowerCase() === "r") reveal();
   });
 
-  updateCredits({ filePageUrl:"#", artist:"—", license:"—" });
+  // boot
+  updateCredits({ filePageUrl:"#", artist:"—", artistUrl:"#", license:"—" });
   newPhoto();
-
-  // --- PWA: offline app shell ---
-  if ("serviceWorker" in navigator){
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(()=>{});
-    });
-  }
 </script>
 </body>
 </html>
